@@ -17,6 +17,7 @@ public class PlayerMovement : MonoBehaviour
     Vector2 movementVector;
     public bool jumpPending;
     public bool isGrounded;
+    private float coyoteTime;
 
     private bool areInputsEnabled = false;
     public bool isTouchingWall;
@@ -39,6 +40,7 @@ public class PlayerMovement : MonoBehaviour
         if (other.collider.tag == "Ground")
         { // Ese algo es el suelo, quiere decir que estamos volando;
             isGrounded = false;
+
         }
     }
 
@@ -68,12 +70,12 @@ public class PlayerMovement : MonoBehaviour
     void disableInputs()
     {
         areInputsEnabled = false;
-        movementInput.Disable();
+        // movementInput.Disable();
     }
     void enableInputs()
     {
         areInputsEnabled = true;
-        movementInput.Enable();
+        // movementInput.Enable();
     }
 
     private void Start()
@@ -88,49 +90,63 @@ public class PlayerMovement : MonoBehaviour
         };
         movementInput.Keyboard.Jump.performed += (_) =>
         {
-            if (isGrounded || isTouchingWall) jumpPending = true;
+            if (isGrounded || isTouchingWall || coyoteTime > 0) jumpPending = true;
 
         };
     }
 
-
+    private void Update()
+    {
+        coyoteTime -= Time.deltaTime;
+    }
     void FixedUpdate()
     {
-        isTouchingWall = Physics2D.Raycast((new Vector2(rbody.position.x - 0.325f, rbody.position.y)), Vector2.right, 0.65f, 1 << LayerMask.NameToLayer("Ground"));
-        Debug.Log("isTouchingWall: " + isTouchingWall);
-
+        isTouchingWall = Physics2D.Raycast((new Vector2(rbody.position.x - 0.375f, rbody.position.y)), Vector2.right, 0.75f, 1 << LayerMask.NameToLayer("Ground"));
         isGrounded = Physics2D.Raycast((new Vector2(rbody.position.x, rbody.position.y - 0.03f)), Vector2.down, 0.6f, 1 << LayerMask.NameToLayer("Ground"));
-        Debug.Log("grounded: " + isGrounded);
+        if (isGrounded) coyoteTime = 0.15f;
 
-        if (jumpPending && isGrounded)
+        if (areInputsEnabled)
         {
-            rbody.velocity = new Vector2(rbody.velocity.x, 1 * jumpSpeed);
-
-            jumpPending = false;
-        }
-        else if (jumpPending && isTouchingWall)
-        {
-            Debug.Log("WALLJUMP: " + movementVector);
-            if (movementVector.x == 1.0f)
+            if (jumpPending && isGrounded)
             {
-                // Apply force to the left;
+                rbody.velocity = new Vector2(rbody.velocity.x, 1 * jumpSpeed);
 
+                jumpPending = false;
             }
-            if (movementVector.x == -1.0f)
+            else if (jumpPending && coyoteTime > 0f)
             {
-                // Apply force to the right;
-                rbody.velocity = new Vector2(1 * jumpSpeed, 1 * jumpSpeed);
-                // if (areInputsEnabled)
-                // {
-                //     Invoke("disableInputs", 0f);
-                //     Invoke("enableInputs", 0.2f);
-                // }
+                rbody.velocity = new Vector2(rbody.velocity.x, 1 * jumpSpeed);
+                Debug.Log("COYOTE JUMP");
+                jumpPending = false;
             }
-            // Disable movement input for 0.5 seconds and re-enable it.
-            jumpPending = false;
-        }
+            else if (jumpPending && isTouchingWall)
+            {
+                if (movementVector.x == 1.0f)
+                {
+                    // Apply force to the left;
+                    rbody.AddForce(new Vector2(-1.2f * jumpSpeed, 1 * jumpSpeed), ForceMode2D.Impulse);
+                    if (areInputsEnabled)
+                    {
+                        Invoke("disableInputs", 0f);
+                        Invoke("enableInputs", 0.2f);
+                    }
+                }
+                if (movementVector.x == -1.0f)
+                {
+                    // Apply force to the right;
+                    rbody.AddForce(new Vector2(1.2f * jumpSpeed, 1 * jumpSpeed), ForceMode2D.Impulse);
+                    if (areInputsEnabled)
+                    {
+                        Invoke("disableInputs", 0f);
+                        Invoke("enableInputs", 0.2f);
+                    }
+                }
+                // Disable movement input for 0.5 seconds and re-enable it.
+                jumpPending = false;
+            }
+            else rbody.velocity = new Vector2(movementVector.x * movementSpeed, rbody.velocity.y);
 
-        rbody.velocity = new Vector2(movementVector.x * movementSpeed, rbody.velocity.y);
+        }
 
     }
 }
